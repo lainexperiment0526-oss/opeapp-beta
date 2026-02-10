@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Volume2, VolumeX, Info } from 'lucide-react';
 import { AppIcon } from './AppIcon';
 import { App, Category } from '@/types/app';
 import { Link } from 'react-router-dom';
@@ -22,6 +22,8 @@ interface VideoAdOverlayProps {
 export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
   const [countdown, setCountdown] = useState(ad.skip_after_seconds || 5);
   const [canSkip, setCanSkip] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -42,6 +44,20 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('openapp_ad_disclaimer_seen');
+    if (!hasSeen) {
+      setShowDisclaimer(true);
+      localStorage.setItem('openapp_ad_disclaimer_seen', 'true');
+    }
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Video */}
@@ -51,7 +67,7 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
           src={ad.video_url}
           autoPlay
           playsInline
-          muted={false}
+          muted={isMuted}
           loop
           className="h-full w-full object-contain"
           onEnded={onClose}
@@ -80,6 +96,16 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
             Ad
           </span>
         </div>
+
+        {/* Mute toggle */}
+        <button
+          onClick={() => setIsMuted((prev) => !prev)}
+          className="absolute bottom-24 left-4 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur px-3 py-2 text-white text-xs font-medium hover:bg-black/80 transition-colors"
+          aria-label={isMuted ? 'Unmute ad' : 'Mute ad'}
+        >
+          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          {isMuted ? 'Muted' : 'Sound On'}
+        </button>
       </div>
 
       {/* App info bar at bottom - like App Store */}
@@ -88,10 +114,17 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
           <AppIcon src={ad.app.logo_url} name={ad.app.name} size="sm" />
         </Link>
         <Link to={`/app/${ad.app.id}`} onClick={onClose} className="flex-1 min-w-0">
-          <p className="text-xs text-white/60">App Store</p>
+          <p className="text-xs text-white/60">OpenApp • Sponsored</p>
           <h4 className="text-white font-medium text-sm truncate">{ad.app.name}</h4>
           <p className="text-xs text-white/60 truncate">{ad.app.category?.name || 'App'}</p>
         </Link>
+        <button
+          onClick={() => setShowDisclaimer(true)}
+          className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+        >
+          <Info className="h-3.5 w-3.5" />
+          About
+        </button>
         <a
           href={ad.app.website_url}
           target="_blank"
@@ -105,6 +138,48 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
           <span className="text-[10px] text-white/40 absolute bottom-1 right-4">In-App Purchases</span>
         )}
       </div>
+
+      {showDisclaimer && (
+        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/70 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-background p-6 text-left shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-semibold text-foreground">OpenApp Ad Disclaimer</h3>
+              <button
+                onClick={() => setShowDisclaimer(false)}
+                className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                aria-label="Close disclaimer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+              <p>
+                This advertisement is provided by a third-party developer. OpenApp does not
+                endorse or guarantee external apps, offers, or content.
+              </p>
+              <p>
+                Tapping the ad opens the app details page so you can review the information
+                before choosing to install or visit.
+              </p>
+              <p>
+                You can close the ad at any time using the Skip button when it becomes available.
+              </p>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setShowDisclaimer(false)}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

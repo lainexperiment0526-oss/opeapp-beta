@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -46,6 +46,9 @@ export function FeedbackDialog({ appId }: FeedbackDialogProps) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
+          <DialogDescription className="sr-only">
+            Send feedback about this app to the developers.
+          </DialogDescription>
         </DialogHeader>
         {!user ? (
           <p className="text-sm text-muted-foreground">

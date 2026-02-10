@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface ImagePreviewDialogProps {
@@ -20,6 +20,10 @@ export function ImagePreviewDialog({ images, initialIndex, open, onOpenChange }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 bg-black/95 border-none">
+        <DialogTitle className="sr-only">Image Preview</DialogTitle>
+        <DialogDescription className="sr-only">
+          Preview of app screenshots.
+        </DialogDescription>
         <button onClick={() => onOpenChange(false)} className="absolute top-3 right-3 z-10 text-white/70 hover:text-white">
           <X className="h-6 w-6" />
         </button>
