@@ -21,7 +21,7 @@ export function useActiveAds() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('app_ads')
-        .select('*, app:apps(*, category:categories(*))')
+        .select('*, app:apps(*, category:categories(*), screenshots:app_screenshots(*))')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
       if (error) throw error;

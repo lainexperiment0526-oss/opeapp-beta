@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Volume2, VolumeX, Info } from 'lucide-react';
 import { AppIcon } from './AppIcon';
+import { ImagePreviewDialog } from './ImagePreviewDialog';
 import { App, Category } from '@/types/app';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -28,7 +29,32 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
   const [canSkip, setCanSkip] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const appWebsiteUrl = (ad as any)?.app?.website_url as string | undefined;
+  const screenshots = (ad.app?.screenshots || [])
+    .slice()
+    .sort((a, b) => a.display_order - b.display_order);
+
+  const normalizeUrl = (url?: string | null) => {
+    const trimmed = (url || '').trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const openAdLink = () => {
+    const externalUrl = normalizeUrl(appWebsiteUrl);
+    if (externalUrl) {
+      window.location.assign(externalUrl);
+      return;
+    }
+    if (appId) {
+      navigate(buildDetailUrl(appId));
+    }
+  };
 
   useEffect(() => {
     if (countdown <= 0) {
@@ -70,24 +96,22 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
         role="button"
         tabIndex={0}
         onClick={() => {
-          if (!appId) return;
           if (onNavigate) {
             onNavigate();
           } else {
             onClose();
           }
-          navigate(buildDetailUrl(appId));
+          openAdLink();
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            if (!appId) return;
             if (onNavigate) {
               onNavigate();
             } else {
               onClose();
             }
-            navigate(buildDetailUrl(appId));
+            openAdLink();
           }
         }}
       >
@@ -150,24 +174,22 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
           role="button"
           tabIndex={0}
           onClick={() => {
-            if (!appId) return;
             if (onNavigate) {
               onNavigate();
             } else {
               onClose();
             }
-            navigate(`/app/${appId}`);
+            openAdLink();
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              if (!appId) return;
               if (onNavigate) {
                 onNavigate();
               } else {
                 onClose();
               }
-              navigate(buildDetailUrl(appId));
+              openAdLink();
             }
           }}
         >
@@ -192,13 +214,21 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (!appId) return;
+              setShowDetails(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+          >
+            View
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               if (onNavigate) {
                 onNavigate();
               } else {
                 onClose();
               }
-              navigate(buildDetailUrl(appId));
+              openAdLink();
             }}
             className="flex-shrink-0 rounded-full bg-blue-500 px-5 py-1.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors"
           >
@@ -207,6 +237,119 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
           {ad.app.has_in_app_purchases && (
             <span className="text-[10px] text-white/40 absolute -bottom-5 right-4">In-App Purchases</span>
           )}
+        </div>
+      </div>
+
+      {/* Slide-up app details */}
+      <div
+        className={`absolute inset-0 z-[115] transition-opacity ${showDetails ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setShowDetails(false)}
+        aria-hidden={!showDetails}
+      >
+        <div className="absolute inset-0 bg-black/60" />
+        <div
+          className={`absolute left-0 right-0 bottom-0 h-[85vh] rounded-t-3xl bg-background border-t border-border transition-transform ${showDetails ? 'translate-y-0' : 'translate-y-full'}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex h-full flex-col">
+            <div className="px-5 pt-4">
+              <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-muted" />
+              <div className="flex items-start gap-4">
+                <AppIcon src={ad.app.logo_url} name={ad.app.name} size="md" />
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-foreground truncate">{ad.app.name}</h3>
+                  <p className="text-sm text-muted-foreground truncate">{ad.app.tagline || ad.app.category?.name || 'App'}</p>
+                  <p className="mt-2 text-sm text-foreground/90 line-clamp-3">{ad.description || ad.title || 'Sponsored app'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex-1 overflow-y-auto px-5 pb-24">
+              <div className="space-y-4 text-sm text-foreground/90">
+                {screenshots.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Screenshots</h4>
+                    <div className="mt-2 flex gap-3 overflow-x-auto scrollbar-hide -mx-5 px-5">
+                      {screenshots.map((shot, idx) => (
+                        <button
+                          key={shot.id}
+                          type="button"
+                          onClick={() => {
+                            setPreviewIndex(idx);
+                            setPreviewOpen(true);
+                          }}
+                          className="flex-shrink-0"
+                          aria-label={`View ${ad.app.name} screenshot ${idx + 1}`}
+                        >
+                          <img
+                            src={shot.image_url}
+                            alt={`${ad.app.name} screenshot`}
+                            className="h-40 w-auto rounded-xl object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {ad.app.description && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">About</h4>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{ad.app.description}</p>
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">Category</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">{ad.app.category?.name || 'App'}</p>
+                </div>
+                {ad.app.age_rating && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Age Rating</h4>
+                    <p className="mt-1 text-sm text-muted-foreground">{ad.app.age_rating}</p>
+                  </div>
+                )}
+                {ad.app.languages?.length ? (
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Languages</h4>
+                    <p className="mt-1 text-sm text-muted-foreground">{ad.app.languages.join(', ')}</p>
+                  </div>
+                ) : null}
+                {ad.app.developer_name && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Developer</h4>
+                    <p className="mt-1 text-sm text-muted-foreground">{ad.app.developer_name}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 px-5 py-4 backdrop-blur">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDetails(false)}
+                  className="flex-1 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground"
+                >
+                  Close
+                </button>
+            <button
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate();
+                } else {
+                  onClose();
+                }
+                if (appId) {
+                  navigate(buildDetailUrl(appId));
+                }
+              }}
+              className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              View App
+            </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -251,6 +394,13 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
           </div>
         </div>
       )}
+
+      <ImagePreviewDialog
+        images={screenshots}
+        initialIndex={previewIndex}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </div>
   );
 }

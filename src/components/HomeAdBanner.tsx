@@ -8,9 +8,15 @@ import { Play } from 'lucide-react';
 export function HomeAdBanner() {
   const { data: ads } = useActiveAds();
   const [activeAd, setActiveAd] = useState<any | null>(null);
+  const [videoErrors, setVideoErrors] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   const handleClose = useCallback(() => setActiveAd(null), []);
+  const openAdDetails = useCallback((ad: any) => {
+    if (ad?.app?.id) {
+      navigate(`/app/${ad.app.id}?refresh=${Date.now()}`);
+    }
+  }, [navigate]);
 
   if (!ads || ads.length === 0) return null;
 
@@ -23,16 +29,32 @@ export function HomeAdBanner() {
             <div
               key={ad.id}
               className="flex-shrink-0 w-[85vw] max-w-md rounded-2xl overflow-hidden bg-card shadow-sm relative group cursor-pointer"
-              onClick={() => navigate(ad.app?.id ? `/app/${ad.app.id}?refresh=${Date.now()}` : '#')}
+              onClick={() => openAdDetails(ad)}
             >
               {/* Video thumbnail */}
               <div className="aspect-[16/9] bg-muted relative">
-                <video
-                  src={ad.video_url}
-                  className="h-full w-full object-cover"
-                  muted
-                  preload="metadata"
-                />
+                {ad.video_url && !videoErrors[ad.id] ? (
+                  <video
+                    src={ad.video_url}
+                    className="h-full w-full object-cover"
+                    muted
+                    preload="metadata"
+                    playsInline
+                    poster={ad.app?.logo_url || undefined}
+                    onError={() =>
+                      setVideoErrors((prev) => ({ ...prev, [ad.id]: true }))
+                    }
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-muted">
+                    <AppIcon
+                      src={ad.app?.logo_url}
+                      name={ad.app?.name || 'App'}
+                      size="lg"
+                      className="shadow-md"
+                    />
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-black/30 transition-colors group-hover:bg-black/40" />
                 <span className="absolute top-3 left-3 rounded bg-yellow-500/90 px-2 py-0.5 text-xs font-bold text-black uppercase">
                   Ad
@@ -63,13 +85,16 @@ export function HomeAdBanner() {
                   </p>
                 </div>
                 {ad.app?.id ? (
-                  <Link
-                    to={`/app/${ad.app.id}?refresh=${Date.now()}`}
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openAdDetails(ad);
+                    }}
                     className="flex-shrink-0 rounded-full bg-primary px-5 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                   >
                     Get
-                  </Link>
+                  </button>
                 ) : (
                   <span className="flex-shrink-0 rounded-full bg-primary px-5 py-1.5 text-sm font-semibold text-primary-foreground opacity-70">
                     Get

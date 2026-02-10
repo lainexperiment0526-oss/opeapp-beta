@@ -34,6 +34,13 @@ export default function AppDetail() {
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [isOpening, setIsOpening] = useState(false);
 
+  const normalizeUrl = useCallback((url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  }, []);
+
   const recordDownload = useCallback(async (appId: string, userId: string) => {
     const { error: insertError } = await supabase
       .from('app_downloads')
@@ -45,13 +52,18 @@ export default function AppDetail() {
   }, [queryClient]);
 
   const handleOpenApp = useCallback((url: string, appId: string) => {
+    const normalizedUrl = normalizeUrl(url);
+    if (!normalizedUrl) {
+      toast.error('No app link available');
+      return;
+    }
     if (user?.id) {
       recordDownload(appId, user.id).catch(() => {});
     }
-    setPendingUrl(url);
+    setPendingUrl(normalizedUrl);
     setIsOpening(true);
     setShowAd(true);
-  }, [recordDownload, user?.id]);
+  }, [normalizeUrl, recordDownload, user?.id]);
 
   const handleAdComplete = useCallback(() => {
     setShowAd(false);
@@ -63,12 +75,16 @@ export default function AppDetail() {
   }, [pendingUrl]);
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = app?.website_url ? normalizeUrl(app.website_url) : window.location.href;
     if (navigator.share) {
       try { await navigator.share({ title: app?.name, url }); } catch {}
     } else {
-      await navigator.clipboard.writeText(url);
-      toast.success('Link copied!');
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied!');
+      } catch {
+        toast.error('Unable to copy link');
+      }
     }
   };
 

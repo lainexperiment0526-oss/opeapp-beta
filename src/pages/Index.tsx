@@ -46,7 +46,7 @@ export default function Index() {
   const normalize = useCallback((value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ''), []);
 
   const filteredApps = useMemo(() => {
-    let filtered = approvedApps;
+    let filtered = search ? (apps ?? []) : approvedApps;
     if (categoryFilter) {
       filtered = filtered.filter(app => String(app.category_id ?? '') === String(categoryFilter));
     }

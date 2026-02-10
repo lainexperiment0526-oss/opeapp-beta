@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
@@ -14,6 +14,12 @@ export function ImagePreviewDialog({ images, initialIndex, open, onOpenChange }:
 
   const prev = () => setIndex(i => (i > 0 ? i - 1 : images.length - 1));
   const next = () => setIndex(i => (i < images.length - 1 ? i + 1 : 0));
+
+  useEffect(() => {
+    if (open) {
+      setIndex(initialIndex);
+    }
+  }, [initialIndex, open]);
 
   if (!images.length) return null;
 
