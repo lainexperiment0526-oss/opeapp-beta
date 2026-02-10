@@ -25,6 +25,8 @@ import AboutOpenApp from "./pages/AboutOpenApp";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import License from "./pages/License";
+import Bookmarks from "./pages/Bookmarks";
+import Feedback from "./pages/Feedback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +68,8 @@ const App = () => {
                 <Route path="/new" element={<NewApps />} />
                 <Route path="/top" element={<TopApps />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/bookmarks" element={<Bookmarks />} />
+                <Route path="/feedback" element={<Feedback />} />
                 <Route path="/about" element={<AboutOpenApp />} />
                 <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
