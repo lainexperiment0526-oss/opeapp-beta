@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePiNetwork } from '@/hooks/usePiNetwork';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { useUserCampaigns, useCreateCampaign, useDeleteCampaign, useUpdateCampaign } from '@/hooks/useAdCampaigns';
@@ -19,6 +20,7 @@ import { Plus, Trash2, Copy, Key, Megaphone, Pause, Play, Eye, MousePointerClick
 export default function AdvertiserDashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { piUser, authenticateWithPi, createPiPayment } = usePiNetwork();
   const { data: campaigns, isLoading } = useUserCampaigns();
   const { data: apiKeys } = useUserApiKeys();
   const createCampaign = useCreateCampaign();
@@ -41,6 +43,7 @@ export default function AdvertiserDashboard() {
     total_budget: 0,
     skip_after_seconds: 5,
     reward_amount: 0,
+    duration_days: 1,
   });
 
   useEffect(() => {
@@ -57,10 +60,50 @@ export default function AdvertiserDashboard() {
     e.preventDefault();
     if (!user) return;
     try {
-      await createCampaign.mutateAsync({ ...form, user_id: user.id });
+      const baseAdFee = 10;
+      const durationCostMap: Record<number, number> = { 1: 10, 2: 20, 3: 50 };
+      const durationCost = durationCostMap[form.duration_days] ?? 10;
+      const totalCost = baseAdFee + durationCost;
+
+      let activePiUser = piUser;
+      if (!activePiUser) {
+        activePiUser = await authenticateWithPi();
+      }
+      if (!activePiUser) {
+        toast.error('Pi authentication required to create ads');
+        return;
+      }
+
+      await createPiPayment(totalCost, 'Ad campaign fee', {
+        type: 'ad_campaign',
+        ad_type: form.ad_type,
+        duration_days: form.duration_days,
+        user_id: activePiUser.uid,
+        name: form.name,
+      });
+
+      await createCampaign.mutateAsync({
+        ...form,
+        user_id: user.id,
+        total_budget: totalCost,
+        daily_budget: Number((totalCost / form.duration_days).toFixed(2)),
+      });
       toast.success('Campaign created! It will be reviewed by admins.');
       setIsCreateOpen(false);
-      setForm({ name: '', ad_type: 'banner', media_url: '', media_type: 'image', destination_url: '', title: '', description: '', daily_budget: 0, total_budget: 0, skip_after_seconds: 5, reward_amount: 0 });
+      setForm({
+        name: '',
+        ad_type: 'banner',
+        media_url: '',
+        media_type: 'image',
+        destination_url: '',
+        title: '',
+        description: '',
+        daily_budget: 0,
+        total_budget: 0,
+        skip_after_seconds: 5,
+        reward_amount: 0,
+        duration_days: 1,
+      });
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -124,6 +167,9 @@ export default function AdvertiserDashboard() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateCampaign} className="space-y-4">
+                <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+                  <p>Pricing: 10 Pi per ad + duration fee (1 day: 10 Pi, 2 days: 20 Pi, 3 days: 50 Pi).</p>
+                </div>
                 <div className="space-y-2">
                   <Label>Campaign Name</Label>
                   <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
@@ -150,6 +196,20 @@ export default function AdvertiserDashboard() {
                   <Input value={form.destination_url} onChange={e => setForm({...form, destination_url: e.target.value})} required placeholder="https://..." />
                 </div>
                 <div className="space-y-2">
+                  <Label>Duration</Label>
+                  <Select
+                    value={String(form.duration_days)}
+                    onValueChange={(v) => setForm({ ...form, duration_days: Number(v) })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 day (10 Pi)</SelectItem>
+                      <SelectItem value="2">2 days (20 Pi)</SelectItem>
+                      <SelectItem value="3">3 days (50 Pi)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Title (optional)</Label>
                   <Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
                 </div>
@@ -169,6 +229,9 @@ export default function AdvertiserDashboard() {
                     <Input type="number" value={form.skip_after_seconds} onChange={e => setForm({...form, skip_after_seconds: Number(e.target.value)})} />
                   </div>
                 )}
+                <div className="rounded-xl border border-border bg-muted px-3 py-2 text-xs text-foreground">
+                  Total: {10 + ({ 1: 10, 2: 20, 3: 50 } as Record<number, number>)[form.duration_days]} Pi
+                </div>
                 <Button type="submit" className="w-full" disabled={createCampaign.isPending}>
                   {createCampaign.isPending ? 'Creating...' : 'Create Campaign'}
                 </Button>

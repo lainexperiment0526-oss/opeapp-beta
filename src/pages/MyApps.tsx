@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePiNetwork } from '@/hooks/usePiNetwork';
 import { Header } from '@/components/Header';
 import { useUpdateApp, useDeleteApp, useAddScreenshot, useDeleteScreenshot } from '@/hooks/useApps';
 import { App, Category, Screenshot } from '@/types/app';
@@ -20,6 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 export default function MyApps() {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
+  const { piUser, authenticateWithPi, createPiPayment } = usePiNetwork();
   
   const updateApp = useUpdateApp();
   const deleteApp = useDeleteApp();
@@ -41,6 +43,11 @@ export default function MyApps() {
     developer_name: '',
     age_rating: '4+',
     whats_new: '',
+    privacy_policy_url: '',
+    developer_website_url: '',
+    compatibility: '',
+    languages: '',
+    has_in_app_purchases: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -109,6 +116,11 @@ export default function MyApps() {
       developer_name: app.developer_name || '',
       age_rating: app.age_rating || '4+',
       whats_new: app.whats_new || '',
+      privacy_policy_url: app.privacy_policy_url || '',
+      developer_website_url: app.developer_website_url || '',
+      compatibility: app.compatibility || '',
+      languages: app.languages?.join(', ') || '',
+      has_in_app_purchases: !!app.has_in_app_purchases,
     });
     setLogoFile(null);
     setScreenshotFiles([]);
@@ -121,6 +133,21 @@ export default function MyApps() {
 
     setIsSubmitting(true);
     try {
+      // Require 5 Pi payment for every edit
+      let activePiUser = piUser;
+      if (!activePiUser) {
+        activePiUser = await authenticateWithPi();
+      }
+      if (!activePiUser) {
+        toast.error('Pi authentication required to edit apps');
+        return;
+      }
+      await createPiPayment(5, 'App edit fee', {
+        type: 'app_edit',
+        app_id: editingApp.id,
+        user_id: activePiUser.uid,
+      });
+
       let logo_url = editingApp.logo_url;
       
       if (logoFile) {
@@ -140,6 +167,11 @@ export default function MyApps() {
         developer_name: formData.developer_name || null,
         age_rating: formData.age_rating,
         whats_new: formData.whats_new || null,
+        privacy_policy_url: formData.privacy_policy_url || null,
+        developer_website_url: formData.developer_website_url || null,
+        compatibility: formData.compatibility || null,
+        languages: formData.languages ? formData.languages.split(',').map(l => l.trim()).filter(Boolean) : [],
+        has_in_app_purchases: !!formData.has_in_app_purchases,
       });
 
       // Upload new screenshots
@@ -312,7 +344,7 @@ export default function MyApps() {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="tagline">Tagline</Label>
               <Input
@@ -361,6 +393,27 @@ export default function MyApps() {
               </div>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="age_rating">Age Rating</Label>
+                <Select
+                  value={formData.age_rating}
+                  onValueChange={(value) => setFormData({ ...formData, age_rating: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select age rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['4+', '9+', '12+', '17+'].map((rating) => (
+                      <SelectItem key={rating} value={rating}>
+                        {rating}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="developer_name">Developer Name</Label>
               <Input
@@ -368,6 +421,47 @@ export default function MyApps() {
                 value={formData.developer_name}
                 onChange={(e) => setFormData({ ...formData, developer_name: e.target.value })}
               />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="developer_website_url">Developer Website</Label>
+                <Input
+                  id="developer_website_url"
+                  type="url"
+                  value={formData.developer_website_url}
+                  onChange={(e) => setFormData({ ...formData, developer_website_url: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="privacy_policy_url">Privacy Policy</Label>
+                <Input
+                  id="privacy_policy_url"
+                  type="url"
+                  value={formData.privacy_policy_url}
+                  onChange={(e) => setFormData({ ...formData, privacy_policy_url: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="compatibility">Compatibility</Label>
+                <Input
+                  id="compatibility"
+                  value={formData.compatibility}
+                  onChange={(e) => setFormData({ ...formData, compatibility: e.target.value })}
+                  placeholder="Web, iOS, Android..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="languages">Languages (comma-separated)</Label>
+                <Input
+                  id="languages"
+                  value={formData.languages}
+                  onChange={(e) => setFormData({ ...formData, languages: e.target.value })}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -387,6 +481,16 @@ export default function MyApps() {
                 value={formData.tags}
                 onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
               />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="has_in_app_purchases"
+                type="checkbox"
+                checked={formData.has_in_app_purchases}
+                onChange={(e) => setFormData({ ...formData, has_in_app_purchases: e.target.checked })}
+              />
+              <Label htmlFor="has_in_app_purchases">Has In-App Purchases</Label>
             </div>
 
             {/* Screenshots */}
@@ -452,7 +556,8 @@ export default function MyApps() {
               </label>
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">Editing an app costs 5 Pi.</p>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
