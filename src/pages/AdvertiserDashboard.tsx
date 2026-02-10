@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
@@ -43,8 +43,13 @@ export default function AdvertiserDashboard() {
     reward_amount: 0,
   });
 
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth', { replace: true });
+    }
+  }, [loading, navigate, user]);
+
   if (!loading && !user) {
-    navigate('/auth');
     return null;
   }
 

@@ -16,7 +16,7 @@ export function RecommendedApps({ currentAppId, categoryId }: RecommendedAppsPro
         .from('apps')
         .select('*, category:categories(*), screenshots:app_screenshots(*)')
         .neq('id', currentAppId)
-        .eq('status', 'approved')
+        .or('status.eq.approved,status.is.null')
         .order('average_rating', { ascending: false })
         .limit(5);
 
@@ -34,7 +34,7 @@ export function RecommendedApps({ currentAppId, categoryId }: RecommendedAppsPro
           .select('*, category:categories(*), screenshots:app_screenshots(*)')
           .neq('id', currentAppId)
           .neq('category_id', categoryId)
-          .eq('status', 'approved')
+          .or('status.eq.approved,status.is.null')
           .order('average_rating', { ascending: false })
           .limit(5 - data.length);
         return [...data, ...(moreApps || [])] as (App & { category: Category; screenshots: Screenshot[] })[];

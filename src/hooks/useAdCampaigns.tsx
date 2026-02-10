@@ -52,6 +52,21 @@ export function useAllCampaigns() {
   });
 }
 
+export function useActiveCampaigns() {
+  return useQuery({
+    queryKey: ['ad_campaigns', 'active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ad_campaigns')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as AdCampaign[];
+    },
+  });
+}
+
 export function useCreateCampaign() {
   const queryClient = useQueryClient();
   return useMutation({

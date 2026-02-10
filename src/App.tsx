@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { PiProvider } from "@/hooks/usePiNetwork";
 import { SplashScreen } from "@/components/SplashScreen";
+import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import AppDetail from "./pages/AppDetail";
 import Auth from "./pages/Auth";
@@ -71,6 +72,7 @@ const App = () => {
                   <Route path="/license" element={<License />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                <Footer />
               </BrowserRouter>
             </TooltipProvider>
           </PiProvider>

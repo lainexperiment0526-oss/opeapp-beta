@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Volume2, VolumeX, Info } from 'lucide-react';
 import { AppIcon } from './AppIcon';
 import { ImagePreviewDialog } from './ImagePreviewDialog';
+import { RecommendedApps } from './RecommendedApps';
 import { App, Category } from '@/types/app';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -322,6 +323,12 @@ export function VideoAdOverlay({ ad, onClose, onNavigate }: VideoAdOverlayProps)
                   </div>
                 )}
               </div>
+
+              {appId && (
+                <div className="pt-2">
+                  <RecommendedApps currentAppId={appId} categoryId={ad.app.category_id ?? null} />
+                </div>
+              )}
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 px-5 py-4 backdrop-blur">
