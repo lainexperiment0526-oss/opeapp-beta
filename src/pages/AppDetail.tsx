@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function AppDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,19 +25,36 @@ export default function AppDetail() {
   const { user } = useAuth();
   const { data: isBookmarked } = useIsBookmarked(id || '', user?.id);
   const toggleBookmark = useToggleBookmark();
+  const queryClient = useQueryClient();
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [showAd, setShowAd] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [isOpening, setIsOpening] = useState(false);
 
-  const handleOpenApp = useCallback((url: string) => {
+  const recordDownload = useCallback(async (appId: string, userId: string) => {
+    const { error: insertError } = await supabase
+      .from('app_downloads')
+      .upsert({ app_id: appId, user_id: userId }, { onConflict: 'app_id,user_id', ignoreDuplicates: true });
+    if (!insertError) {
+      queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+    }
+  }, [queryClient]);
+
+  const handleOpenApp = useCallback((url: string, appId: string) => {
+    if (user?.id) {
+      recordDownload(appId, user.id).catch(() => {});
+    }
     setPendingUrl(url);
+    setIsOpening(true);
     setShowAd(true);
-  }, []);
+  }, [recordDownload, user?.id]);
 
   const handleAdComplete = useCallback(() => {
     setShowAd(false);
+    setIsOpening(false);
     if (pendingUrl) {
       window.open(pendingUrl, '_blank', 'noopener,noreferrer');
       setPendingUrl(null);
@@ -118,9 +137,12 @@ export default function AppDetail() {
               <h1 className="text-xl font-bold text-foreground">{app.name}</h1>
               <p className="text-sm text-muted-foreground">{app.tagline}</p>
               <div className="mt-3 flex items-center gap-2">
-                <button onClick={() => handleOpenApp(app.website_url)}
-                  className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground">
-                  Open
+                <button
+                  onClick={() => handleOpenApp(app.website_url, app.id)}
+                  disabled={isOpening}
+                  className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
+                >
+                  {isOpening ? 'Opening...' : 'Open'}
                 </button>
                 <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
                   <Share2 className="h-5 w-5 text-primary" />
@@ -232,6 +254,7 @@ export default function AppDetail() {
             <div className="space-y-4">
               {app.developer_name && <InfoRow label="Provider" value={app.developer_name} />}
               <InfoRow label="Category" value={app.category?.name || 'App'} />
+              <InfoRow label="Downloads" value={app.downloads_count?.toLocaleString() || '0'} />
               <InfoRow label="Compatibility" value={app.compatibility} expandable />
               <InfoRow label="Languages" value={app.languages?.join(', ') || 'English'} expandable />
               <InfoRow label="Age Rating" value={app.age_rating} expandable />

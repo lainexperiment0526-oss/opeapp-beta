@@ -114,7 +114,7 @@ export function VideoAdOverlay({ ad, onClose }: VideoAdOverlayProps) {
           <AppIcon src={ad.app.logo_url} name={ad.app.name} size="sm" />
         </Link>
         <Link to={`/app/${ad.app.id}`} onClick={onClose} className="flex-1 min-w-0">
-          <p className="text-xs text-white/60">OpenApp • Sponsored</p>
+          <p className="text-xs text-white/60">OpenApp &middot; Sponsored</p>
           <h4 className="text-white font-medium text-sm truncate">{ad.app.name}</h4>
           <p className="text-xs text-white/60 truncate">{ad.app.category?.name || 'App'}</p>
         </Link>
