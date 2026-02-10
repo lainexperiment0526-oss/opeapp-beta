@@ -18,6 +18,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { AdInterstitial } from '@/components/AdInterstitial';
 
 export default function AppDetail() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,8 @@ export default function AppDetail() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [isOpening, setIsOpening] = useState(false);
+  const [showOpenAd, setShowOpenAd] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState<{ url: string; appId: string } | null>(null);
 
   const normalizeUrl = useCallback((url: string) => {
     const trimmed = url.trim();
@@ -56,13 +59,25 @@ export default function AppDetail() {
       toast.error('No app link available');
       return;
     }
-    if (user?.id) {
-      recordDownload(appId, user.id).catch(() => {});
-    }
+    setPendingOpen({ url: normalizedUrl, appId });
     setIsOpening(true);
+    setShowOpenAd(true);
+  }, [normalizeUrl]);
+
+  const handleOpenAfterAd = useCallback(() => {
+    const next = pendingOpen;
+    setShowOpenAd(false);
+    setPendingOpen(null);
+    if (!next) {
+      setIsOpening(false);
+      return;
+    }
+    if (user?.id) {
+      recordDownload(next.appId, user.id).catch(() => {});
+    }
     setTimeout(() => setIsOpening(false), 1500);
-    window.location.assign(normalizedUrl);
-  }, [normalizeUrl, recordDownload, user?.id]);
+    window.location.assign(next.url);
+  }, [pendingOpen, recordDownload, user?.id]);
 
   const handleShare = async () => {
     const shareUrl = app?.id ? `${window.location.origin}/app/${app.id}` : window.location.href;
@@ -154,6 +169,7 @@ export default function AppDetail() {
   return (
     <>
     <div className="min-h-screen bg-background pb-20">
+      {showOpenAd && <AdInterstitial trigger="app-open" onComplete={handleOpenAfterAd} />}
       <Header />
       
       <main className="mx-auto max-w-4xl">

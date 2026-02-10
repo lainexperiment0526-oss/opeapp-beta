@@ -11,15 +11,16 @@ interface AdInterstitialProps {
 }
 
 export function AdInterstitial({ onComplete, trigger }: AdInterstitialProps) {
-  const { showPiAd, isPiReady } = usePiNetwork();
-  const { data: appAds } = useActiveAds();
-  const { data: campaignAds } = useActiveCampaigns();
+  const { showPiAd, isPiReady, piLoading } = usePiNetwork();
+  const { data: appAds, isLoading: appAdsLoading } = useActiveAds();
+  const { data: campaignAds, isLoading: campaignAdsLoading } = useActiveCampaigns();
   const [showingAppAd, setShowingAppAd] = useState<any>(null);
   const [showingCampaignAd, setShowingCampaignAd] = useState<any>(null);
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (attempted) return;
+    if (appAdsLoading || campaignAdsLoading || piLoading) return;
     setAttempted(true);
 
     const eligibleCampaigns = (campaignAds || []).filter(
@@ -29,16 +30,46 @@ export function AdInterstitial({ onComplete, trigger }: AdInterstitialProps) {
       ...(appAds || []).map((ad) => ({ kind: 'app' as const, ad })),
       ...eligibleCampaigns.map((ad) => ({ kind: 'campaign' as const, ad })),
     ];
+    const hasInventory = combinedAds.length > 0;
 
-    // Randomly choose between Pi AdNetwork and app video ads
+    if (trigger === 'app-open') {
+      if (isPiReady) {
+        showPiAd('interstitial').then((success) => {
+          if (!success && hasInventory) {
+            const randomAd = combinedAds[Math.floor(Math.random() * combinedAds.length)];
+            if (randomAd.kind === 'app') {
+              setShowingAppAd(randomAd.ad);
+            } else {
+              setShowingCampaignAd(randomAd.ad);
+            }
+          } else {
+            onComplete();
+          }
+        });
+        return;
+      }
+
+      if (hasInventory) {
+        const randomAd = combinedAds[Math.floor(Math.random() * combinedAds.length)];
+        if (randomAd.kind === 'app') {
+          setShowingAppAd(randomAd.ad);
+        } else {
+          setShowingCampaignAd(randomAd.ad);
+        }
+        return;
+      }
+
+      onComplete();
+      return;
+    }
+
+    // Default behavior (e.g. auth): randomly choose between Pi AdNetwork and app/campaign ads
     const usePiAd = Math.random() > 0.5 && isPiReady;
 
     if (usePiAd) {
-      // Try Pi AdNetwork interstitial
       const adType = Math.random() > 0.5 ? 'interstitial' : 'rewarded';
       showPiAd(adType as 'interstitial' | 'rewarded').then((success) => {
-        if (!success && combinedAds.length > 0) {
-          // Fallback to app/campaign ad
+        if (!success && hasInventory) {
           const randomAd = combinedAds[Math.floor(Math.random() * combinedAds.length)];
           if (randomAd.kind === 'app') {
             setShowingAppAd(randomAd.ad);
@@ -49,8 +80,7 @@ export function AdInterstitial({ onComplete, trigger }: AdInterstitialProps) {
           onComplete();
         }
       });
-    } else if (combinedAds.length > 0) {
-      // Show random app/campaign ad
+    } else if (hasInventory) {
       const randomAd = combinedAds[Math.floor(Math.random() * combinedAds.length)];
       if (randomAd.kind === 'app') {
         setShowingAppAd(randomAd.ad);
@@ -58,12 +88,11 @@ export function AdInterstitial({ onComplete, trigger }: AdInterstitialProps) {
         setShowingCampaignAd(randomAd.ad);
       }
     } else if (isPiReady) {
-      // Try Pi AdNetwork as fallback
       showPiAd('interstitial').then(() => onComplete());
     } else {
       onComplete();
     }
-  }, [attempted, isPiReady, appAds, campaignAds]);
+  }, [attempted, appAdsLoading, campaignAdsLoading, piLoading, isPiReady, appAds, campaignAds, showPiAd, trigger, onComplete]);
 
   const handleClose = useCallback(() => {
     setShowingAppAd(null);
