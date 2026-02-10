@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, X, Clock, CheckCircle, XCircle, ArrowLeft, Upload, Image } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Clock, CheckCircle, XCircle, ArrowLeft, Upload, Image, Video } from 'lucide-react';
 import { AppIcon } from '@/components/AppIcon';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -32,6 +32,10 @@ export default function MyApps() {
   const [editingApp, setEditingApp] = useState<(App & { category?: Category; screenshots?: Screenshot[] }) | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
+  const [adFile, setAdFile] = useState<File | null>(null);
+  const [adTitle, setAdTitle] = useState('');
+  const [existingAd, setExistingAd] = useState<{ id: string; video_url: string; title: string | null } | null>(null);
+  const [isAdLoading, setIsAdLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     tagline: '',
@@ -110,7 +114,7 @@ export default function MyApps() {
       tagline: app.tagline || '',
       description: app.description || '',
       website_url: app.website_url,
-      category_id: app.category_id || '',
+      category_id: app.category_id ? String(app.category_id) : '',
       tags: app.tags?.join(', ') || '',
       version: app.version,
       developer_name: app.developer_name || '',
@@ -124,8 +128,38 @@ export default function MyApps() {
     });
     setLogoFile(null);
     setScreenshotFiles([]);
+    setAdFile(null);
     setIsDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (!isDialogOpen || !editingApp || !user) return;
+    let isMounted = true;
+    setIsAdLoading(true);
+    supabase
+      .from('app_ads')
+      .select('id, video_url, title')
+      .eq('app_id', editingApp.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (error) {
+          setExistingAd(null);
+          setAdTitle('');
+        } else {
+          setExistingAd(data ? { id: data.id, video_url: data.video_url, title: data.title } : null);
+          setAdTitle(data?.title || '');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsAdLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [editingApp?.id, isDialogOpen, user?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +216,38 @@ export default function MyApps() {
           image_url: imageUrl,
           display_order: (editingApp.screenshots?.length || 0) + i,
         });
+      }
+
+      // Update or create marketing video ad
+      if (user) {
+        if (adFile) {
+          const videoUrl = await uploadFile(adFile, 'ads');
+          if (existingAd?.id) {
+            const { error: updateAdError } = await supabase
+              .from('app_ads')
+              .update({ video_url: videoUrl, title: adTitle || null })
+              .eq('id', existingAd.id);
+            if (updateAdError) throw updateAdError;
+          } else {
+            const { error: insertAdError } = await supabase
+              .from('app_ads')
+              .insert({
+                app_id: editingApp.id,
+                user_id: user.id,
+                video_url: videoUrl,
+                title: adTitle || null,
+                is_active: true,
+                skip_after_seconds: 5,
+              });
+            if (insertAdError) throw insertAdError;
+          }
+        } else if (existingAd?.id && adTitle !== (existingAd.title || '')) {
+          const { error: updateAdTitleError } = await supabase
+            .from('app_ads')
+            .update({ title: adTitle || null })
+            .eq('id', existingAd.id);
+          if (updateAdTitleError) throw updateAdTitleError;
+        }
       }
 
       toast.success('App updated successfully');
@@ -369,14 +435,14 @@ export default function MyApps() {
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={formData.category_id}
-                  onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                  onValueChange={(value) => setFormData({ ...formData, category_id: String(value) })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
+                      <SelectItem key={cat.id} value={String(cat.id)}>
                         {cat.name}
                       </SelectItem>
                     ))}
@@ -554,6 +620,74 @@ export default function MyApps() {
                   }}
                 />
               </label>
+            </div>
+
+            {/* Marketing Video Ad */}
+            <div className="space-y-3">
+              <Label>Marketing Video Ad</Label>
+              {isAdLoading ? (
+                <p className="text-sm text-muted-foreground">Loading ad...</p>
+              ) : existingAd && !adFile ? (
+                <div className="space-y-3">
+                  <div className="relative rounded-xl overflow-hidden bg-muted">
+                    <video src={existingAd.video_url} controls className="w-full max-h-64 object-contain" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ad_title_edit">Ad Title</Label>
+                    <Input
+                      id="ad_title_edit"
+                      value={adTitle}
+                      onChange={(e) => setAdTitle(e.target.value)}
+                      placeholder="Catchy ad headline..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="ad_title_edit">Ad Title</Label>
+                  <Input
+                    id="ad_title_edit"
+                    value={adTitle}
+                    onChange={(e) => setAdTitle(e.target.value)}
+                    placeholder="Catchy ad headline..."
+                  />
+                </div>
+              )}
+
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-3 transition-colors hover:border-primary">
+                <Video className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {adFile ? 'Change video ad' : existingAd ? 'Replace video ad' : 'Upload video ad (30-60s, MP4)'}
+                </span>
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 100 * 1024 * 1024) {
+                        toast.error('Video must be under 100MB');
+                        return;
+                      }
+                      setAdFile(file);
+                    }
+                  }}
+                />
+              </label>
+
+              {adFile && (
+                <div className="relative rounded-xl overflow-hidden bg-muted">
+                  <video src={URL.createObjectURL(adFile)} controls className="w-full max-h-64 object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setAdFile(null)}
+                    className="absolute top-2 right-2 rounded-full bg-destructive p-1.5 text-destructive-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-2">

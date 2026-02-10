@@ -65,15 +65,24 @@ export default function AppDetail() {
   }, [normalizeUrl, recordDownload, user?.id]);
 
   const handleShare = async () => {
-    const url = app?.website_url ? normalizeUrl(app.website_url) : window.location.href;
+    const shareUrl = app?.id ? `${window.location.origin}/app/${app.id}` : window.location.href;
+    const shareData = { title: app?.name || 'OpenApp', url: shareUrl };
     if (navigator.share) {
-      try { await navigator.share({ title: app?.name, url }); } catch {}
-    } else {
       try {
-        await navigator.clipboard.writeText(url);
-        toast.success('Link copied!');
+        await navigator.share(shareData);
+        return;
       } catch {
-        toast.error('Unable to copy link');
+        // fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Link copied!');
+    } catch {
+      try {
+        window.prompt('Copy this link', shareUrl);
+      } catch {
+        toast.error('Unable to share link');
       }
     }
   };

@@ -164,7 +164,7 @@ export default function SubmitApp() {
       tagline: draft.tagline || '',
       description: draft.description || '',
       website_url: draft.website_url || '',
-      category_id: draft.category_id || '',
+      category_id: draft.category_id ? String(draft.category_id) : '',
       tags: draft.tags?.join(', ') || '',
       version: draft.version || '1.0',
       developer_name: draft.developer_name || '',
@@ -503,11 +503,11 @@ export default function SubmitApp() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: String(value) })}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
